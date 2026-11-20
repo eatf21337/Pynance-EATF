@@ -12,6 +12,7 @@ from views.bank_view import BankView
 from views.casino_view import CasinoView
 from views.multi_view import MultiView
 from views.settings_view import SettingsView
+from views.spy_view_view import SpyViewView
 from assets import Assets
 import logging
 
@@ -83,6 +84,12 @@ class MainApp(ctk.CTk):
                 dark_image=Image.open(self.assets.getAssetPath("settings.png")),
                 size=(24, 24),
             )
+
+            # Ajout
+            spy_view = ctk.CTkImage(
+                dark_image=Image.open(self.assets.getAssetPath("eye.png")),
+                size=(24, 24),
+            )
         except:
             logo = None
             casino_pic = None
@@ -91,6 +98,7 @@ class MainApp(ctk.CTk):
             multi_pic = None
             bank_pic = None
             settings = None
+            spy_view = None
 
         button_style = {
             "text": "",
@@ -101,7 +109,7 @@ class MainApp(ctk.CTk):
             "hover_color": "#2a2d2e",
         }
 
-        self.menu_bar.grid_rowconfigure(6, weight=1)
+        self.menu_bar.grid_rowconfigure(7, weight=1)
         self.logo = ctk.CTkLabel(self.menu_bar, image=logo, text="")
         self.logo.grid(row=0, column=0, padx=8, pady=(8, 20))
 
@@ -111,7 +119,7 @@ class MainApp(ctk.CTk):
             command=lambda: self.show_frame("Casino"),
             **button_style,
         )
-        self.btn_casino.grid(row=3, column=0, padx=8, pady=2)
+        self.btn_casino.grid(row=4, column=0, padx=8, pady=2)
 
         self.btn_shop = ctk.CTkButton(
             self.menu_bar,
@@ -119,7 +127,7 @@ class MainApp(ctk.CTk):
             command=lambda: self.show_frame("Shop"),
             **button_style,
         )
-        self.btn_shop.grid(row=2, column=0, padx=8, pady=2)
+        self.btn_shop.grid(row=3, column=0, padx=8, pady=2)
 
         self.btn_market = ctk.CTkButton(
             self.menu_bar,
@@ -129,13 +137,21 @@ class MainApp(ctk.CTk):
         )
         self.btn_market.grid(row=1, column=0, padx=8, pady=2)
 
+        self.btn_spy_view = ctk.CTkButton(
+            self.menu_bar,
+            image=spy_view,
+            command=lambda: self.show_frame("SpyView"),
+            **button_style,
+        )
+        self.btn_spy_view.grid(row=2, column=0, padx=8, pady=2)
+
         self.btn_multi = ctk.CTkButton(
             self.menu_bar,
             image=multi_pic,
             command=lambda: self.show_frame("Multi"),
             **button_style,
         )
-        self.btn_multi.grid(row=4, column=0, padx=8, pady=2)
+        self.btn_multi.grid(row=5, column=0, padx=8, pady=2)
 
         self.btn_bank = ctk.CTkButton(
             self.menu_bar,
@@ -143,7 +159,7 @@ class MainApp(ctk.CTk):
             command=lambda: self.show_frame("Bank"),
             **button_style,
         )
-        self.btn_bank.grid(row=5, column=0, padx=8, pady=2)
+        self.btn_bank.grid(row=6, column=0, padx=8, pady=2)
 
         self.btn_settings = ctk.CTkButton(
             self.menu_bar,
@@ -151,7 +167,7 @@ class MainApp(ctk.CTk):
             command=lambda: self.show_frame("Settings"),
             **button_style,
         )
-        self.btn_settings.grid(row=7, column=0, padx=8, pady=10)
+        self.btn_settings.grid(row=8, column=0, padx=8, pady=10)
 
         self.navigation_buttons = {
             "Casino": self.btn_casino,
@@ -160,6 +176,7 @@ class MainApp(ctk.CTk):
             "Multi": self.btn_multi,
             "Bank": self.btn_bank,
             "Settings": self.btn_settings,
+            "SpyView": self.btn_spy_view,
         }
         self.frames = {}
         self.init_frames()
@@ -176,6 +193,7 @@ class MainApp(ctk.CTk):
             "Bank": BankView,
             "Multi": MultiView,
             "Settings": SettingsView,
+            "SpyView": SpyViewView,
         }
 
         for name, FrameClass in page_classes.items():
@@ -199,6 +217,7 @@ class MainApp(ctk.CTk):
             "Trading": "Application - Trading",
             "Multi": "Application - Multijoueur",
             "Bank": "Application - Banque",
+            "SpyView": "Application - View",
         }
 
         if hasattr(frame, "refresh"):

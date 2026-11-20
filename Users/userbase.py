@@ -8,11 +8,12 @@ from assets import Assets
 
 
 class User:
-    def __init__(self, nom, lvl, starting_cash):
+    def __init__(self, nom, lvl, starting_cash, tier):
         self.nom = nom
         self.lvl = lvl
         self.wallet = {}
         self.holdings = starting_cash
+        self.tier = tier
 
     # Définir comment les utilisateurs simulés prennent des décisions
     def make_decision(self, market, good_stocks):
@@ -127,6 +128,7 @@ class Userbase:
                     obj,
                     10 * self.difficulty_multiplier**2,
                     math.ceil(t1_names[obj] * self.difficulty_multiplier**2),
+                    0,
                 )
             )
             t1_names.pop(obj)
@@ -145,6 +147,7 @@ class Userbase:
                     obj,
                     rd.uniform(7, 9.5) * self.difficulty_multiplier**2,
                     math.ceil(t2_names[obj] * self.difficulty_multiplier**2),
+                    1,
                 )
             )
             t2_names.pop(obj)
@@ -181,6 +184,7 @@ class Userbase:
                             10000000000 * self.difficulty_multiplier**2,
                         )
                     ),
+                    2,
                 )
             )
 
@@ -207,6 +211,7 @@ class Userbase:
                             10000000 * self.difficulty_multiplier**2,
                         )
                     ),
+                    3,
                 )
             )
         self.userbase.extend(users)

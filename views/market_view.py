@@ -25,8 +25,8 @@ class MarketView(ctk.CTkFrame):
         self.current_time_view = 30
 
         # Configuration de la grille
-        self.grid_columnconfigure(0, weight=3)  # Graphique + actualités
-        self.grid_columnconfigure(1, weight=1)  # Panneau de passation des ordres
+        self.grid_columnconfigure(0, weight=9, uniform="panels")  # Graphique + actualités
+        self.grid_columnconfigure(1, weight=5, uniform="panels")  # Panneau de passation des ordres
         self.grid_rowconfigure(1, weight=3)  # Ligne du graphique principal
         self.grid_rowconfigure(2, weight=1)  # Ligne des actualités / onglets inférieurs
 
@@ -405,7 +405,6 @@ class MarketView(ctk.CTkFrame):
         changes = [(stock, _latest_change_pct(stock)) for stock in stocks]
         advancing = sum(change > 0 for _, change in changes)
         declining = sum(change < 0 for _, change in changes)
-        unchanged = len(changes) - advancing - declining
 
         breadth_text = f"{advancing} montants  ·  {declining} descendants"
         self.market_breadth_label.configure(text=breadth_text)
@@ -432,8 +431,10 @@ class MarketView(ctk.CTkFrame):
     def reset(self):
         self.current_stock = list(self.engine.market.stocks.values())[0]
 
-        new_options = self.engine.market.get_names()
+        new_options = self._get_dropdown_options()
+
         self.name_select.configure(values=new_options)
+
         self.name_select.set(new_options[0] if new_options else "")
 
         self.refresh()
