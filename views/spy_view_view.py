@@ -329,7 +329,7 @@ class SpyViewView(ctk.CTkFrame):
 
     def dataframe_doer(self):
         df = pd.DataFrame()
-        holdings = [round(data.holdings, 2) for data in self.engine.userbase.userbase]
+        holdings = [round(data.get_holdings(self.engine.market), 2) for data in self.engine.userbase.userbase]
 
         # Données de base
         df["Portfolio"] = [data.wallet for data in self.engine.userbase.userbase]
@@ -467,6 +467,8 @@ class SpyViewView(ctk.CTkFrame):
         return descriptions[tier]
 
     def data_architect_renderer(self, choice, container):
+        if self.current_user_index is None:
+            return
         user_row = self.data.iloc[self.current_user_index]
         portfolio = user_row["Portfolio"]  # Dictionnaire {ticker: quantité}
 
@@ -531,11 +533,12 @@ class SpyViewView(ctk.CTkFrame):
     def refresher(self):
         self.previous_data = self.data
         self.data = self.dataframe_doer()
-        self.user_slot_1.on_change()
-        self.user_slot_2.on_change()
         self.userbase_slot_1.on_change()
-        desc = self.descriptor()
-        self.ai_desc.configure(text=desc)
+
+        if self.current_user_index is not None:
+            self.user_slot_1.on_change()
+            self.user_slot_2.on_change()
+            self.ai_desc.configure(text=self.descriptor())
 
         self.leaderboarder()
 

@@ -16,9 +16,13 @@ class User:
         self.tier = tier
         self.initial_data = starting_cash
 
-    @property
-    def holdings(self):
-        return sum(data for data in self.wallet.values()) + self.liquidity
+    def get_holdings(self, market):
+        stock_value = sum(
+            qty * market.stocks[ticker].price
+            for ticker, qty in self.wallet.items()
+            if ticker in market.stocks
+        )
+        return stock_value + self.liquidity
 
     # Définir comment les utilisateurs simulés prennent des décisions
     def make_decision(self, market, good_stocks):
