@@ -12,8 +12,13 @@ class User:
         self.nom = nom
         self.lvl = lvl
         self.wallet = {}
-        self.holdings = starting_cash
+        self.liquidity = starting_cash
         self.tier = tier
+        self.initial_data = starting_cash
+
+    @property
+    def holdings(self):
+        return sum(data for data in self.wallet.values()) + self.liquidity
 
     # Définir comment les utilisateurs simulés prennent des décisions
     def make_decision(self, market, good_stocks):
@@ -39,7 +44,7 @@ class User:
 
         if best_ticker and best_score > 0.01:
             stock = market.stocks[best_ticker]
-            budget = self.holdings * rd.uniform(0.05, 0.20)
+            budget = self.liquidity * rd.uniform(0.05, 0.20)
             qty = int(budget // stock.price)
             if qty > 0:
                 self.buy_stock(stock, qty)
@@ -55,8 +60,8 @@ class User:
 
     def buy_stock(self, stock, qty):
         cost = stock.price * qty
-        if self.holdings >= cost and qty > 0:
-            self.holdings -= cost
+        if self.liquidity >= cost and qty > 0:
+            self.liquidity -= cost
             self.wallet[stock.ticker] = self.wallet.get(stock.ticker, 0) + qty
             stock.buy(qty)
 
@@ -64,7 +69,7 @@ class User:
         owned = self.wallet.get(stock.ticker, 0)
         qty = min(qty, owned)
         if qty > 0:
-            self.holdings += stock.price * qty
+            self.liquidity += stock.price * qty
             self.wallet[stock.ticker] -= qty
             if self.wallet[stock.ticker] <= 0:
                 del self.wallet[stock.ticker]
@@ -89,7 +94,7 @@ class User:
         return self.name <= other.name
 
     def __repr__(self):
-        return f"{self.nom} (holding ${self.holdings})"
+        return f"{self.nom} (holding ${self.liquidity})"
 
 
 class Userbase:

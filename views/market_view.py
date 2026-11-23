@@ -440,16 +440,30 @@ class MarketView(ctk.CTkFrame):
         self.refresh()
 
 
-# Pour afficher les nombres sous un meilleur format (ex. : 1 Mrd)
+# Pour afficher les nombres sous un meilleur format (ex. : 1 G)
 def number_formatter(valeur):
     valeur = float(valeur)
+    if valeur >= 1e33:
+        return f"{valeur / 1e12:.2f}Dc"
+    if valeur >= 1e30:
+        return f"{valeur / 1e12:.2f}No"
+    if valeur >= 1e27:
+        return f"{valeur / 1e12:.2f}Oc"
+    if valeur >= 1e24:
+        return f"{valeur / 1e12:.2f}Sp"
+    if valeur >= 1e21:
+        return f"{valeur / 1e12:.2f}Sx"
+    if valeur >= 1e18:
+        return f"{valeur / 1e12:.2f}Qi"
+    if valeur >= 1e15:
+        return f"{valeur / 1e12:.2f}Qa"
     if valeur >= 1e12:
         return f"{valeur / 1e12:.2f}T"
     if valeur >= 1e9:
         return f"{valeur / 1e9:.2f}G"
-    elif valeur >= 1e6:
+    if valeur >= 1e6:
         return f"{valeur / 1e6:.2f}M"
-    elif valeur >= 1e3:
+    if valeur >= 1e3:
         return f"{valeur / 1e3:.2f}k"
     return str(valeur)
 
