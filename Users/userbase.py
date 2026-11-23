@@ -26,12 +26,12 @@ class User:
 
     # Définir comment les utilisateurs simulés prennent des décisions
     def make_decision(self, market, good_stocks):
-        if rd.random() > 0.30:
+        if rd.random() > 0.30*self.lvl:
             return
 
         # Essayer des actions
         all_tickers = list(market.stocks.keys())
-        sample_tickers = rd.sample(all_tickers, min(5, len(all_tickers)))
+        sample_tickers = rd.sample(all_tickers, min(int(5*self.lvl), len(all_tickers)))
 
         #
         skill_factor = max(0.05, (10.5 - min(10.0, self.lvl)) / 10.0)
@@ -57,9 +57,9 @@ class User:
             if owned_qty <= 0:
                 continue
             perceived = good_stocks.get(ticker, 0.0) + rd.gauss(0, noise_std)
-            if perceived < -0.01:
+            if perceived < 0:
                 stock = market.stocks[ticker]
-                sell_qty = max(1, int(owned_qty * rd.uniform(0.3, 1.0)))
+                sell_qty = max(1, int(owned_qty * rd.uniform(0.3*math.sqrt(self.lvl), 1.0)))
                 self.sell_stock(stock, sell_qty)
 
     def buy_stock(self, stock, qty):
