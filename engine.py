@@ -6,6 +6,10 @@ from Bank.bank import Bank
 import json
 import time
 import math
+import random
+import pandas as pd
+from collections import defaultdict
+import statistics
 
 
 class Engine:
@@ -49,10 +53,13 @@ class Engine:
         self.database.set("tick", {"iteration": 0, "prices": {}})
         self.snapshot_id = None
         self.needSnapshot = True
+        self.avg_cost = defaultdict(list)
         self.userbase.build_T1s()
         self.userbase.build_T2s()
         self.userbase.build_T3s()
         self.userbase.build_T4s()
+        self.userbase.populate_wallets(self.market)
+        self.transaction_history = []
         self.bank = Bank()
         self.bank.add_player(self.username)
 
@@ -79,6 +86,16 @@ class Engine:
         portfolios[username] = positions
         self.database.set("portfolios", portfolios)
         current_stock.sell(x)
+
+        self.transaction_history.append({
+            "Action": "SELL",
+            "Ticker": ticker,
+            "Amount_Shares": -x,
+            "Amount_Cash": current_stock.price * x,
+            "Share_Price": current_stock.price,
+            "Profit": (current_stock.price - statistics.mean(self.avg_cost[current_stock.ticker])) / statistics.mean(self.avg_cost[current_stock.ticker]) * 100
+
+        })
         return True
 
     def buy(self, username, ticker, x):
@@ -86,10 +103,15 @@ class Engine:
         if current_stock is None or x <= 0:
             return False
 
+        x = min(x, current_stock.available_shares)
+
+
         user_cash = self.database.getPath(f"cash:{username}")
         cost = x * current_stock.price
         if user_cash is None or user_cash < cost:
             return False
+
+        self.avg_cost[current_stock.ticker].append(current_stock.price)            
 
         self.database.setPath(f"cash:{username}", user_cash - cost)
         portfolios = dict(self.database.get("portfolios") or {})
@@ -98,6 +120,16 @@ class Engine:
         portfolios[username] = positions
         self.database.set("portfolios", portfolios)
         current_stock.buy(x)
+
+        self.transaction_history.append({
+            "Action": "BUY",
+            "Ticker": ticker,
+            "Amount_Shares": x,
+            "Amount_Cash": current_stock.price * x,
+            "Share_Price": current_stock.price,
+            "Profit": None
+        })
+
         return True
 
     def newPlayer(self, username):
@@ -316,3 +348,5 @@ class Engine:
             if td and td.get("iteration", 0) > self.iteration and self.market:
                 self.iteration = td["iteration"]
                 self.market.apply_tick(td["prices"])
+            
+

@@ -14,10 +14,10 @@ class MarketView(ctk.CTkFrame):
         self.engine = engine
         self._last_displayed_event = None
 
+        options = self._get_dropdown_options()
+        self.current_stock = self.engine.market.find_stock_by_long_name(options[0])
 
-        self.current_stock = list(self.engine.market.stocks.values())[
-            0
-        ]  # Sélectionner la première action par défaut
+        # Sélectionner la première action par défaut
 
         # Vues temporelles
 
@@ -25,8 +25,12 @@ class MarketView(ctk.CTkFrame):
         self.current_time_view = 30
 
         # Configuration de la grille
-        self.grid_columnconfigure(0, weight=9, uniform="panels")  # Graphique + actualités
-        self.grid_columnconfigure(1, weight=5, uniform="panels")  # Panneau de passation des ordres
+        self.grid_columnconfigure(
+            0, weight=9, uniform="panels"
+        )  # Graphique + actualités
+        self.grid_columnconfigure(
+            1, weight=5, uniform="panels"
+        )  # Panneau de passation des ordres
         self.grid_rowconfigure(1, weight=3)  # Ligne du graphique principal
         self.grid_rowconfigure(2, weight=1)  # Ligne des actualités / onglets inférieurs
 
@@ -55,6 +59,9 @@ class MarketView(ctk.CTkFrame):
         found = self.engine.market.find_stock_by_long_name(stock_name)
         if found is not None:
             self.current_stock = found
+            formatted = f"{found.name} ({found.ticker})"
+            self.name_select.configure(values=self._get_dropdown_options())
+            self.name_select.set(formatted)
             self.refresh()
 
     # Construire la barre du haut
@@ -108,7 +115,7 @@ class MarketView(ctk.CTkFrame):
 
         self.user_cash = ctk.CTkLabel(
             bar,
-            text=f"⭐ {str(self.engine.database.getPath(f"cash:{self.engine.username}"))} $ ⭐",
+            text=f"⭐ {self.engine.database.getPath(f"cash:{self.engine.username}"):.2f} $ ⭐",
             font=("Arial", 20, "bold"),
             text_color="#0ecb81",
         )
@@ -332,8 +339,8 @@ class MarketView(ctk.CTkFrame):
     # Pour rafraîchir avec la database
     def _refresh_owned_shares(self):
         portfolios = self.engine.database.get("portfolios") or {}
-        owned = portfolios.get(self.engine.username, {}).get(
-            self.current_stock.ticker, 0
+        owned = int(
+            portfolios.get(self.engine.username, {}).get(self.current_stock.ticker, 0)
         )
         self.owned_shares_label.configure(text=f"Possédées : {owned} actions")
 
@@ -370,13 +377,13 @@ class MarketView(ctk.CTkFrame):
                 self.news_box.configure(state="normal")
                 self.news_box.insert(
                     "end",
-                    f"{next_event['scope'].upper()} - "
-                    f"{next_event['headline']}\n"
+                    f"{next_event['scope'].upper()} - " f"{next_event['headline']}\n",
                 )
                 self.news_box.see("end")
                 self.news_box.configure(state="disabled")
                 self._last_displayed_event = event_entry
-        except:pass
+        except:
+            pass
 
         # Actualiser le graphique
         self.ax.clear()
@@ -470,11 +477,13 @@ def number_formatter(valeur):
 
 MAX_CANDLES = 100
 
+
 # Pourcentage de changement
 def _latest_change_pct(stock):
     if len(stock.history) < 2 or stock.history[-2] <= 0:
         return 0.0
     return (stock.history[-1] - stock.history[-2]) / stock.history[-2] * 100
+
 
 # Filtrer pour n'avoir que le bon nombre d'"itérations" pour la durée sélectionnée
 def _history_window(history, time_view):
@@ -482,6 +491,7 @@ def _history_window(history, time_view):
         return history, 0
     start = max(0, len(history) - time_view)
     return history[start:], start
+
 
 # Créer les bougies du graphique
 def candlesticker(ax, prices, start_index=0, previous_close=None):

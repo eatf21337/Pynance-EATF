@@ -14,30 +14,11 @@ from assets import Assets
 """
 Roadmap :
 
-Changer la logique de refresh des boutons pour éviter de les delete à chaque fois
-Add les players à data
-Faire les filters
-Picker entre market et userbase
-Ajouter une search bar
-Ajouter un systeme de pages
-Ajouter la right view
-    Users:
-    Nom
-    Holdings
-    Statut
-    Portfolio
-    Concentration
-    Win rate
-    Trading style
-    Niveau
-    Volatility
-    Percentile
-    Historique de transactions
-Ajouter les graphes pour user/userbase/stock/market
-Fix money displaying through app
+Complete the selector
+Add search bar
+Add userbase views
 
 """
-
 
 
 class SpyViewView(ctk.CTkFrame):
@@ -54,7 +35,7 @@ class SpyViewView(ctk.CTkFrame):
 
         self.assets = Assets("Assets")
 
-        self.user_options = ["Portfolio", "Portfolio (Graphique)"]
+        self.user_options = ["Portfolio", "Portfolio (Graphique)", "Historique de transactions", "Évolution des actifs"]
         self.userbase_options = ["aaaaaaaaaa", "bbbbbbbbbbb"]
 
         self.button_style = {
@@ -71,7 +52,7 @@ class SpyViewView(ctk.CTkFrame):
             1: "Personnalité publique",
             2: "Corporation",
             3: "Civil",
-            4: "Joueur"
+            4: "Joueur",
         }
 
         self.page_len = 30
@@ -138,7 +119,7 @@ class SpyViewView(ctk.CTkFrame):
             text="Données",
             font=("Arial", 22, "bold"),
             justify="left",
-            )
+        )
         title.pack(anchor="w", padx=12, pady=(12, 0))
 
         # 2 Selections
@@ -156,9 +137,10 @@ class SpyViewView(ctk.CTkFrame):
 """
         # Premier panneau
 
-        self.card1 = ctk.CTkScrollableFrame(panel, fg_color="#121418", scrollbar_button_color="red", corner_radius=8)
+        self.card1 = ctk.CTkScrollableFrame(
+            panel, fg_color="#121418", scrollbar_button_color="red", corner_radius=8
+        )
         self.card1.pack(fill="x", padx=12, pady=12)
-
 
         # Filtres
         filter_btn_area = ctk.CTkFrame(self.card1, fg_color="#121418")
@@ -166,43 +148,43 @@ class SpyViewView(ctk.CTkFrame):
 
         filter_btn_area.columnconfigure((0, 1, 2), weight=1, uniform="header_cols")
 
-        self.username_btn = ctk.CTkButton(                
-                filter_btn_area,
-                text=f"Nom d'utilisateur",
-                anchor="w",
-                height=30,
-                fg_color="transparent",
-                hover_color="#545A6D",
-                font=("Consolas", 11),
-                corner_radius=0,
-                command=lambda: self.data_sorter("Nom d'utilisateur"),
-                )
+        self.username_btn = ctk.CTkButton(
+            filter_btn_area,
+            text=f"Nom d'utilisateur",
+            anchor="w",
+            height=30,
+            fg_color="transparent",
+            hover_color="#545A6D",
+            font=("Consolas", 11),
+            corner_radius=0,
+            command=lambda: self.data_sorter("Nom d'utilisateur"),
+        )
         self.username_btn.grid(row=0, column=0, sticky="nsew", padx=(5, 0))
 
-        self.holdings_btn = ctk.CTkButton(                
-                filter_btn_area,
-                text=f"Actifs",
-                height=30,
-                fg_color="transparent",
-                hover_color="#545A6D",
-                font=("Consolas", 11),
-                corner_radius=0,
-                anchor="center",
-                command=lambda: self.data_sorter("Holdings"),
-                )
+        self.holdings_btn = ctk.CTkButton(
+            filter_btn_area,
+            text=f"Actifs",
+            height=30,
+            fg_color="transparent",
+            hover_color="#545A6D",
+            font=("Consolas", 11),
+            corner_radius=0,
+            anchor="center",
+            command=lambda: self.data_sorter("Holdings"),
+        )
         self.holdings_btn.grid(row=0, column=1, sticky="nsew", padx=(0, 0))
 
-        self.status_btn = ctk.CTkButton(                
-                filter_btn_area,
-                text=f"Statut",
-                height=30,
-                fg_color="transparent",
-                hover_color="#545A6D",
-                font=("Consolas", 11),
-                corner_radius=0,
-                anchor="e",
-                command=lambda: self.data_sorter("Statut")
-                )
+        self.status_btn = ctk.CTkButton(
+            filter_btn_area,
+            text=f"Statut",
+            height=30,
+            fg_color="transparent",
+            hover_color="#545A6D",
+            font=("Consolas", 11),
+            corner_radius=0,
+            anchor="e",
+            command=lambda: self.data_sorter("Statut"),
+        )
         self.status_btn.grid(row=0, column=2, sticky="nsew", padx=(0, 5))
 
         # Vue
@@ -230,30 +212,40 @@ class SpyViewView(ctk.CTkFrame):
         self.text_maker = ("▼ ", "▸ ", "▲ ")
         self.colorizer = ("#f6465d", "#848e9c", "#0ba367")
         names = [self.data.iloc[_]["Nom d'utilisateur"] for _ in range(len(self.data))]
-        holding = [f"{self.text_maker[row['Change']]}{row['Holdings']:,.2f} $" for _, row in self.data.iterrows()]
+        holding = [
+            f"{self.text_maker[row['Change']]}{row['Holdings']:,.2f} $"
+            for _, row in self.data.iterrows()
+        ]
         status = [self.data.iloc[_]["Statut"] for _ in range(len(self.data))]
-        self.max_name = max(len(h) for h in names)
-        self.max_hold = max(len(h) for h in holding)
-        self.max_stat = max(len(h) for h in status)
+        self.max_name = max(len(h) for h in names if h is not None)
+        self.max_hold = max(len(h) for h in holding if h is not None)
+        self.max_stat = max(len(h) for h in status if h is not None)
 
         self.leaderboarder()
 
         # Pages
         nav = ctk.CTkFrame(panel, fg_color="transparent")
         nav.pack(fill="x", padx=12, pady=4)
-        ctk.CTkButton(nav, text="< Précédent", width=90, command=lambda: self.page_change_doer(-1)).pack(side="left")
+        ctk.CTkButton(
+            nav, text="< Précédent", width=90, command=lambda: self.page_change_doer(-1)
+        ).pack(side="left")
         self.page_label = ctk.CTkLabel(nav, text="Page 1")
         self.page_label.pack(side="left", expand=True)
-        ctk.CTkButton(nav, text="Suivant >", width=90, command=lambda: self.page_change_doer(1)).pack(side="right")
+        ctk.CTkButton(
+            nav, text="Suivant >", width=90, command=lambda: self.page_change_doer(1)
+        ).pack(side="right")
 
         # Vue
-        self.userbase_slot_1 = DataSlot(panel, self.userbase_options, self.data_architect_renderer)
+        self.userbase_slot_1 = DataSlot(
+            panel, self.userbase_options, self.data_architect_renderer
+        )
         self.userbase_slot_1.pack(fill="both", expand=True, padx=12, pady=6)
 
     def user_carder(self):
         if not hasattr(self, "card"):
             self.card = ctk.CTkFrame(self, fg_color="#181a20", corner_radius=6)
             self.card.grid(row=1, column=1, sticky="nsew", padx=(6, 12), pady=3)
+            self.card.grid_propagate(False)
 
         for widget in self.card.winfo_children():
             widget.destroy()
@@ -301,15 +293,15 @@ class SpyViewView(ctk.CTkFrame):
         def update_wrap(event):
             if not self.ai_desc.winfo_exists():
                 return
-            
+
             scaling = ctk.ScalingTracker.get_widget_scaling(self.ai_desc)
-            usable_width = (event.width / scaling) - 4
-            new_wrap = max(10, int(usable_width))
-        
-            if self.ai_desc.cget("wraplength") != new_wrap:
+            new_wrap = max(100, int((event.width / scaling) - 35))
+            current_wrap = self.ai_desc.cget("wraplength")
+
+            if abs(current_wrap - new_wrap) > 10:
                 self.ai_desc.configure(wraplength=new_wrap)
 
-        self.ai_desc.bind("<Configure>", update_wrap)
+        self.card.bind("<Configure>", update_wrap)
 
         # Les 2 views
         slots = ctk.CTkFrame(self.card, fg_color="transparent")
@@ -319,34 +311,77 @@ class SpyViewView(ctk.CTkFrame):
         for row in range(2):
             slots.grid_rowconfigure(row, weight=1, uniform="user_slots")
 
-        self.user_slot_1 = DataSlot(slots, self.user_options, self.data_architect_renderer)
+        self.user_slot_1 = DataSlot(
+            slots, self.user_options, self.data_architect_renderer
+        )
         self.user_slot_1.grid(row=0, column=0, sticky="nsew", padx=8, pady=6)
         self.user_slot_1.on_change(self.user_options[0])
 
-        self.user_slot_2 = DataSlot(slots, self.user_options, self.data_architect_renderer)
+        self.user_slot_2 = DataSlot(
+            slots, self.user_options, self.data_architect_renderer
+        )
         self.user_slot_2.grid(row=1, column=0, sticky="nsew", padx=8, pady=6)
         self.user_slot_2.on_change(self.user_options[1])
 
     def dataframe_doer(self):
         df = pd.DataFrame()
-        holdings = [round(data.get_holdings(self.engine.market), 2) for data in self.engine.userbase.userbase]
 
         # Données de base
-        df["Portfolio"] = [data.wallet for data in self.engine.userbase.userbase]
-        df["Liquidités"] = [data.liquidity for data in self.engine.userbase.userbase]
-        df["Nom d'utilisateur"] = [data.nom for data in self.engine.userbase.userbase]
-        df["Holdings"] = holdings
-        df["Statut"] = [self.tier_illustrater[data.tier] for data in self.engine.userbase.userbase]
-        df["Niveau"] = [data.lvl for data in self.engine.userbase.userbase]
-        df["Données de départ"] = [data.initial_data for data in self.engine.userbase.userbase]
+        df["Nom d'utilisateur"] = [
+            data.nom for data in self.engine.userbase.userbase
+        ] + [name for name in self.engine.database.data["playerlist"]]
+        df["Portfolio"] = [data.wallet for data in self.engine.userbase.userbase] + [
+            (p := self.engine.database.get("portfolios") or {}).get(player, {})
+            for player in self.engine.database.data["playerlist"]
+        ]
+        df["Liquidités"] = [
+            data.liquidity for data in self.engine.userbase.userbase
+        ] + [
+            self.engine.database.data["cash"][_]
+            for _ in self.engine.database.data["playerlist"]
+        ]
+
+        df["Statut"] = [
+            self.tier_illustrater[data.tier] for data in self.engine.userbase.userbase
+        ] + [
+            self.tier_illustrater[4] for data in range(len(self.engine.database.data["playerlist"]))
+        ]
+        df["Niveau"] = [data.lvl for data in self.engine.userbase.userbase] + [
+            0 for _ in range(len(self.engine.database.data["playerlist"]))
+        ]
+        df["Données de départ"] = [
+            data.initial_data for data in self.engine.userbase.userbase
+        ] + [self.engine.config["starting_cash"] for _ in range(len(self.engine.database.data["playerlist"]))]
 
         # Données calculées
-        df["G/P"] = abs((df["Holdings"] - df["Données de départ"])/df["Données de départ"] * 100)
+        df["Holdings"] = [
+            sum(
+                qty * self.engine.market.stocks[ticker].price
+                for ticker, qty in portfolio.items()
+                if ticker in self.engine.market.stocks
+            )
+            + liquidity
+            for portfolio, liquidity in zip(df["Portfolio"], df["Liquidités"])
+        ]
+
+        df["G/P"] = abs(
+            (df["Holdings"] - df["Données de départ"]) / df["Données de départ"] * 100
+        )
 
         if self.previous_data is not None:
-            df["Change"] = np.select((df["Holdings"] > self.previous_data["Holdings"], df["Holdings"] < self.previous_data["Holdings"]), (2, 0), default=1)
+            df["Change"] = np.select(
+                (
+                    df["Holdings"] > self.previous_data["Holdings"],
+                    df["Holdings"] < self.previous_data["Holdings"],
+                ),
+                (2, 0),
+                default=1,
+            )
         else:
             df["Change"] = 1
+
+        df["Percentile (Argent)"] = df["Holdings"].rank(pct=True) * 100
+        df["Percentile (Rendement)"] = df["G/P"].rank(pct=True) * 100
 
         return df
 
@@ -359,7 +394,10 @@ class SpyViewView(ctk.CTkFrame):
         page_df = sorted_df.iloc[start : start + self.page_len]
 
         names = page_df["Nom d'utilisateur"].tolist()
-        holdings = [f"{self.text_maker[r['Change']]}{r['Holdings']:,.2f} $" for _, r in page_df.iterrows()]
+        holdings = [
+            f"{self.text_maker[r['Change']]}{r['Holdings']:,.2f} $"
+            for _, r in page_df.iterrows()
+        ]
         statuses = page_df["Statut"].tolist()
 
         for i, btn in enumerate(self.mover_buttons):
@@ -370,7 +408,11 @@ class SpyViewView(ctk.CTkFrame):
 
                 btn.configure(
                     text=f"{names[i]:<{self.max_name}}     {holdings[i]:>{self.max_hold}}     {statuses[i]:>{self.max_stat}}",
-                    fg_color="#545A6D" if real_idx == self.current_user_index else "transparent",
+                    fg_color=(
+                        "#545A6D"
+                        if real_idx == self.current_user_index
+                        else "transparent"
+                    ),
                     border_color=color,
                     command=lambda idx=real_idx: self.open_card(idx),
                 )
@@ -392,20 +434,25 @@ class SpyViewView(ctk.CTkFrame):
 
         self.page = 0
 
-        # Ajouter la genre de flèche 
+        # Ajouter la genre de flèche
         if col_name == "Holdings":
-            self.holdings_btn.configure(text=f"{"▼" if not self.sort_asc else "▲"} Actifs")
+            self.holdings_btn.configure(
+                text=f"{"▼" if not self.sort_asc else "▲"} Actifs"
+            )
             self.status_btn.configure(text=f"Statut")
             self.username_btn.configure(text=f"Nom d'utilisateur")
         elif col_name == "Statut":
             self.holdings_btn.configure(text=f"Actifs")
-            self.status_btn.configure(text=f"{"▼" if not self.sort_asc else "▲"} Statut")
+            self.status_btn.configure(
+                text=f"{"▼" if not self.sort_asc else "▲"} Statut"
+            )
             self.username_btn.configure(text=f"Nom d'utilisateur")
         elif col_name == "Nom d'utilisateur":
             self.holdings_btn.configure(text=f"Actifs")
             self.status_btn.configure(text=f"Statut")
-            self.username_btn.configure(text=f"Nom d'utilisateur {"▼" if not self.sort_asc else "▲"}")
-        
+            self.username_btn.configure(
+                text=f"Nom d'utilisateur {"▼" if not self.sort_asc else "▲"}"
+            )
 
         self.leaderboarder()
 
@@ -417,7 +464,7 @@ class SpyViewView(ctk.CTkFrame):
 
     def descriptor(self):
         # Tier, Niveau, Holdings, Liquidités, Concentration, Win rate, Trading style, Volatility, Percentile
-        tier = self.data.iloc[self.current_user_index]["Statut"] 
+        tier = self.data.iloc[self.current_user_index]["Statut"]
         niveau = self.data.iloc[self.current_user_index]["Niveau"]
         holdings = self.data.iloc[self.current_user_index]["Holdings"]
         liquidites = self.data.iloc[self.current_user_index]["Liquidités"]
@@ -426,7 +473,6 @@ class SpyViewView(ctk.CTkFrame):
         trading_style = "a"
         volatility = 0
         win_rate = 0
-
 
         descriptions = {
             "Gestionnaire d'actifs": (
@@ -461,7 +507,7 @@ class SpyViewView(ctk.CTkFrame):
                 "Son capital en jeu atteint {holdings}, incluant {liquidites} de liquidités prêtes à être déployées, "
                 "avec une concentration de {concentration}. Son style de trading {trading_style} se traduit par "
                 "une volatilité de {volatility} et un win rate de {win_rate}."
-            )
+            ),
         }
 
         return descriptions[tier]
@@ -476,28 +522,32 @@ class SpyViewView(ctk.CTkFrame):
             scroll = ctk.CTkScrollableFrame(container, fg_color="transparent")
             scroll.pack(fill="both", expand=True)
 
-            columns = 3
+            columns = 2
             for col in range(columns):
-                scroll.grid_columnconfigure(col, weight=1)
+                scroll.grid_columnconfigure(col, weight=1, uniform="group1")
 
             for idx, (stock, qty) in enumerate(portfolio.items()):
-                row = idx // columns
-                col = idx % columns
-                
+                r = idx // columns
+                c = idx % columns
+                temp = self.engine.market.get_stock_by_ticker(stock)
+                label_str = f"{temp.name} ({temp.ticker})" if temp else stock
+                if len(label_str) > 30:
+                    label_str = label_str[:27] + "..."
+
                 ctk.CTkLabel(
                     scroll,
-                    text=f"{stock:<8} : {qty} actions",
+                    text=f"{label_str:<30} : {qty:>10,}",
                     text_color="#eaecef",
                     font=("Consolas", 12),
-                    justify="left"
-                ).grid(row=row, column=col, sticky="w", padx=14, pady=4)
+                    anchor="w",
+                ).grid(row=r, column=c, sticky="ew", padx=14, pady=3)
 
         elif choice == "Portfolio (Graphique)":
             fig, ax = plt.subplots(figsize=(4, 2.5), facecolor="#121418")
             ax.set_facecolor("#121418")
 
             tickers = list(portfolio.keys())
-            quantities = list(portfolio.values())
+            quantities = [a * self.engine.market.stocks[b].price for a, b in zip(list(portfolio.values()), tickers)]
 
             wedges, texts, autotexts = ax.pie(
                 quantities,
@@ -521,6 +571,94 @@ class SpyViewView(ctk.CTkFrame):
             canvas.get_tk_widget().pack(fill="both", expand=True, padx=6, pady=6)
             plt.close(fig)
 
+        elif choice == "Historique de transactions":
+            if self.current_user_index >= len(self.engine.userbase.userbase):
+                df_history = pd.DataFrame(self.engine.transaction_history)
+            else:
+                df_history = pd.DataFrame(
+                self.engine.userbase.userbase[self.current_user_index].transaction_history
+                )
+
+            header_frame = ctk.CTkFrame(container, fg_color="#1e2329", corner_radius=6)
+            header_frame.pack(fill="x", padx=5, pady=(5, 2))
+
+            header_text = (
+                f"{'#':<5} "
+                f"{'Stock':<10} "
+                f"{'Ticker':<8} "
+                f"{'Actions':<16} "
+                f"{'Fonds':<20} "
+                f"{"Prix d'achat":<16} "
+                f"{'Profit (%)':<6}"
+            )
+
+            ctk.CTkLabel(
+                header_frame,
+                text=header_text,
+                text_color="#848e9c",
+                font=("Consolas", 12, "bold"),
+                anchor="w",
+            ).pack(fill="x", padx=10, pady=6)
+
+            scroll = ctk.CTkScrollableFrame(container, fg_color="transparent")
+            scroll.pack(fill="both", expand=True)
+
+            rows = []
+            for idx, row in df_history.iloc[::-1].iterrows():
+                shares = f"{int(row['Amount_Shares']):,}"
+                cash = f"${abs(row['Amount_Cash']):,.2f}"
+                price = f"${row['Share_Price']:,.2f}"
+                val = row.get("Profit")
+                if val is None or pd.isna(val):
+                    profit = "-"
+                else:
+                    profit = f"{float(val):+,.1f} %"
+
+                line = (
+                    f"{idx:<5} "
+                    f"{row['Action']:<10} "
+                    f"{row['Ticker']:<8} "
+                    f"{shares:<16} "
+                    f"{cash:<20} "
+                    f"{price:<16} "
+                    f"{profit:<6}"
+                )
+                rows.append(line)
+
+            ctk.CTkLabel(
+                scroll,
+                text="\n\n".join(rows),
+                text_color="#eaecef",
+                font=("Consolas", 12),
+                justify="left",
+                anchor="w",
+            ).pack(fill="x", padx=10, pady=4)
+
+        elif choice == "Évolution des actifs":
+            if self.current_user_index >= len(self.engine.userbase.userbase):
+                ctk.CTkLabel(container, text="Historique non disponible pour ce joueur.", text_color="#848e9c").pack(pady=20)
+                return
+
+            history = self.engine.userbase.userbase[self.current_user_index].holdings_history
+            color = "#0ecb81" if history[-1] >= history[0] else "#f6465d"
+
+            fig, ax = plt.subplots(figsize=(4, 2.5), facecolor="#121418")
+            ax.set_facecolor("#121418")
+
+            ax.plot(history, color=color, linewidth=1.8)
+            ax.fill_between(range(len(history)), history, min(history), color=color, alpha=0.12)
+            ax.grid(True, color="#2b313a", linestyle="--", linewidth=0.5)
+            ax.tick_params(colors="#848e9c", labelsize=8)
+            for spine in ax.spines.values():
+                spine.set_color("#2b313a")
+
+            fig.tight_layout()
+            canvas = FigureCanvasTkAgg(fig, master=container)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill="both", expand=True, padx=6, pady=6)
+            plt.close(fig)
+
+
     def refresh(self):
         self.previous_data = None
 
@@ -542,6 +680,8 @@ class SpyViewView(ctk.CTkFrame):
 
         self.leaderboarder()
 
+
+# Vu que les vues répètent toujours les mêmes structures :
 
 class DataSlot(ctk.CTkFrame):
     def __init__(self, master, options, render_callback):
