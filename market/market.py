@@ -56,7 +56,7 @@ class Stock:
         capped_drift = max(-0.0008, min(0.0008, self.drift))
         gbm_shock = (capped_drift - 0.5 * (self.volatility ** 2)) + random.gauss(0, self.volatility)
         daily_growth = 1.10 ** (1 / 365)
-        self.base_price = max(0.01, self.base_price * math.exp(gbm_shock) * daily_growth)
+        self.base_price = self.base_price * math.exp(gbm_shock) * daily_growth
 
         net_demand = (self.bought - self.sold) / self.shares
         raw_impact = self.impact * net_demand
@@ -71,7 +71,7 @@ class Stock:
         max_total_move = max(0.15, 10.0 * self.volatility)
         final_return = max_total_move * math.tanh(raw_total_return / max_total_move)
 
-        self.price = max(0.01, self.price * (1.0 + final_return))
+        self.price = self.price * (1.0 + final_return)
         self.history.append(self.price)
         self.bought = self.sold = 0
 

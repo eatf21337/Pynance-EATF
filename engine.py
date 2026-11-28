@@ -59,7 +59,10 @@ class Engine:
         self.userbase.build_T3s()
         self.userbase.build_T4s()
         self.userbase.populate_wallets(self.market)
-        self.transaction_history = []
+        self.database.set("player_history", {})
+        self.database.set("player_holdings_history", {})
+        self.database.set("starting_cash", self.config["starting_cash"])
+        self.database.setPath(f"player_holdings_history:{self.username}", [self.config["starting_cash"]])
         self.bank = Bank()
         self.bank.add_player(self.username)
 
@@ -87,15 +90,22 @@ class Engine:
         self.database.set("portfolios", portfolios)
         current_stock.sell(x)
 
-        self.transaction_history.append({
+        costs = self.avg_cost[(username, current_stock.ticker)]
+        avg_price = statistics.mean(costs) if costs else None
+        profit = ((current_stock.price - avg_price) / avg_price * 100) if avg_price else None
+
+        hist = list(self.database.getPath(f"player_history:{username}") or [])
+        hist.append({
             "Action": "SELL",
             "Ticker": ticker,
             "Amount_Shares": -x,
             "Amount_Cash": current_stock.price * x,
             "Share_Price": current_stock.price,
-            "Profit": (current_stock.price - statistics.mean(self.avg_cost[current_stock.ticker])) / statistics.mean(self.avg_cost[current_stock.ticker]) * 100
+            "Profit": profit
 
         })
+        self.database.setPath(f"player_history:{username}", hist[-100:])
+
         return True
 
     def buy(self, username, ticker, x):
@@ -111,7 +121,7 @@ class Engine:
         if user_cash is None or user_cash < cost:
             return False
 
-        self.avg_cost[current_stock.ticker].append(current_stock.price)            
+        self.avg_cost[(username, current_stock.ticker)].append(current_stock.price)            
 
         self.database.setPath(f"cash:{username}", user_cash - cost)
         portfolios = dict(self.database.get("portfolios") or {})
@@ -121,7 +131,8 @@ class Engine:
         self.database.set("portfolios", portfolios)
         current_stock.buy(x)
 
-        self.transaction_history.append({
+        hist = list(self.database.getPath(f"player_history:{username}") or [])
+        hist.append({
             "Action": "BUY",
             "Ticker": ticker,
             "Amount_Shares": x,
@@ -129,11 +140,13 @@ class Engine:
             "Share_Price": current_stock.price,
             "Profit": None
         })
+        self.database.setPath(f"player_history:{username}", hist[-100:])
 
         return True
 
     def newPlayer(self, username):
         self.database.setPath(f"cash:{username}", self.config["starting_cash"])
+        self.database.setPath(f"player_holdings_history:{self.username}", [self.config["starting_cash"]])
         self.bank.add_player(username)
         if self.market and self.market.stocks:
             self.database.set(
@@ -250,6 +263,22 @@ class Engine:
     def tick(self):
         if self.hosting:
             self.iteration += 1
+
+            if self.iteration % 5 == 0:
+                players = self.database.get("playerlist") or []
+                cash_map = self.database.get("cash") or {}
+                portfolios = self.database.get("portfolios") or {}
+                for p in players:
+                    pos = portfolios.get(p, {})
+                    stock_val = sum(
+                        q * self.market.stocks[t].price
+                        for t, q in pos.items()
+                        if t in self.market.stocks
+                    )
+                    total = round(cash_map.get(p, 0) + stock_val, 2)
+                    h = list(self.database.getPath(f"player_holdings_history:{p}") or [])
+                    h.append(total)
+                    self.database.setPath(f"player_holdings_history:{p}", h[-200:])
 
             if self.iteration % self.bank.mandatory_payment_interval == 0:
                 for player_id in list(self.bank.player_loans):

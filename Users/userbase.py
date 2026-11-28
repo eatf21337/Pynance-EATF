@@ -69,6 +69,7 @@ class User:
             alloc_min = 0.10 if self.lvl >= 7 else 0.05
             alloc_max = 0.35 if self.lvl >= 7 else 0.15
             budget = self.liquidity * rd.uniform(alloc_min, alloc_max)
+
             qty = int(budget // stock.price)
             if qty > 0:
                 self.buy_stock(stock, qty)
@@ -319,11 +320,14 @@ class Userbase:
 
     def populate_wallets(self, market):
         all_stocks = list(market.stocks.values())
+        filter = market.get_stock_by_ticker("SHIB-USD")
+        if filter in all_stocks:
+            all_stocks.remove(filter)
         if not all_stocks:
             return
 
         bot_tier_doer_of_magic = {
-            0: (587, 587),
+            0: (586, 586),
             1: (10, 50),
             2: (250, 587),
             3: (1, 20)

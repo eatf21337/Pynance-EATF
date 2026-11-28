@@ -1,8 +1,8 @@
 import customtkinter as ctk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.pyplot as plt
-from PIL import Image, ImageTk
-import tkinter.font as tkfont
+from matplotlib.figure import Figure
+from tkinter import filedialog
+from PIL import Image
 
 import pandas as pd
 import numpy as np
@@ -17,6 +17,7 @@ Roadmap :
 Complete the selector
 Add search bar
 Add userbase views
+Export data
 
 """
 
@@ -35,8 +36,20 @@ class SpyViewView(ctk.CTkFrame):
 
         self.assets = Assets("Assets")
 
-        self.user_options = ["Portfolio", "Portfolio (Graphique)", "Historique de transactions", "Évolution des actifs"]
-        self.userbase_options = ["aaaaaaaaaa", "bbbbbbbbbbb"]
+        self.user_options = [
+            "Portfolio",
+            "Portfolio (Graphique)",
+            "Historique de transactions",
+            "Évolution des actifs",
+        ]
+        self.userbase_options = [
+            "Top rendements",
+            "Richesse par statut",
+            "Actions populaires",
+            "Statistiques globales",
+        ]
+
+        self.active_options = [0, 0, 1]
 
         self.button_style = {
             "text": "",
@@ -67,6 +80,8 @@ class SpyViewView(ctk.CTkFrame):
 
         self.data = self.dataframe_doer()
         self.current_user_index = None
+
+        self.slot_exports = {0: None, 1: None, 2: None}
 
         self.top_bar_builder_yet_again()
         self.user_carder()
@@ -123,24 +138,24 @@ class SpyViewView(ctk.CTkFrame):
         title.pack(anchor="w", padx=12, pady=(12, 0))
 
         # 2 Selections
-        """
-        self.name_select = ctk.CTkComboBox(
+        self.selector = ctk.CTkEntry(
             panel,
-            values=(""),
-            command=self.switch_data,
-            fg_color="#2b313a",
-            button_color="#363c4e",
-            border_width=0,
             width=180,
+            height=36,
+            placeholder_text="Filtrer par ...",
+            show=None,
+            state="normal",
+            border_color="#181a20",
+            fg_color="#121418",
         )
-        self.name_select.pack(side="left", padx=12, pady=8)
-"""
+        self.selector.pack(anchor="w", padx=12, pady=(12, 6))
+
+        self.selector.bind("<KeyRelease>", self.button_filter_doer)
+
         # Premier panneau
 
-        self.card1 = ctk.CTkScrollableFrame(
-            panel, fg_color="#121418", scrollbar_button_color="red", corner_radius=8
-        )
-        self.card1.pack(fill="x", padx=12, pady=12)
+        self.card1 = ctk.CTkScrollableFrame(panel, fg_color="#121418", corner_radius=8)
+        self.card1.pack(fill="x", padx=12, pady=(6, 12))
 
         # Filtres
         filter_btn_area = ctk.CTkFrame(self.card1, fg_color="#121418")
@@ -209,7 +224,7 @@ class SpyViewView(ctk.CTkFrame):
             self.mover_buttons.append(btn)
 
         # Trouver les dimensions
-        self.text_maker = ("▼ ", "▸ ", "▲ ")
+        self.text_maker = ("▼ ", "▶ ", "▲ ")
         self.colorizer = ("#f6465d", "#848e9c", "#0ba367")
         names = [self.data.iloc[_]["Nom d'utilisateur"] for _ in range(len(self.data))]
         holding = [
@@ -221,25 +236,50 @@ class SpyViewView(ctk.CTkFrame):
         self.max_hold = max(len(h) for h in holding if h is not None)
         self.max_stat = max(len(h) for h in status if h is not None)
 
-        self.leaderboarder()
+        self.leaderboarder(
+            self.data[
+                self.data["Nom d'utilisateur"].str.contains(
+                    self.selector.get(), case=False, na=False, regex=False
+                )
+            ]
+        )
 
         # Pages
         nav = ctk.CTkFrame(panel, fg_color="transparent")
         nav.pack(fill="x", padx=12, pady=4)
         ctk.CTkButton(
-            nav, text="< Précédent", width=90, command=lambda: self.page_change_doer(-1)
+            nav,
+            text="< Précédent",
+            width=90,
+            border_color="#848e9c",
+            fg_color="#121418",
+            command=lambda: self.page_change_doer(-1),
         ).pack(side="left")
         self.page_label = ctk.CTkLabel(nav, text="Page 1")
         self.page_label.pack(side="left", expand=True)
         ctk.CTkButton(
-            nav, text="Suivant >", width=90, command=lambda: self.page_change_doer(1)
+            nav,
+            text="Suivant >",
+            width=90,
+            border_color="#848e9c",
+            fg_color="#121418",
+            command=lambda: self.page_change_doer(1),
         ).pack(side="right")
 
         # Vue
         self.userbase_slot_1 = DataSlot(
-            panel, self.userbase_options, self.data_architect_renderer
+            panel,
+            0,
+            self.userbase_options,
+            self.data_architect_renderer_but_for_userbase,
         )
         self.userbase_slot_1.pack(fill="both", expand=True, padx=12, pady=6)
+        self.after(
+            200,
+            lambda: self.userbase_slot_1.on_change(
+                0, self.userbase_options[self.active_options[0]]
+            ),
+        )
 
     def user_carder(self):
         if not hasattr(self, "card"):
@@ -251,6 +291,8 @@ class SpyViewView(ctk.CTkFrame):
             widget.destroy()
 
         if self.current_user_index is None:
+            self.slot_exports[1] = None
+            self.slot_exports[2] = None
             self.placeholder = ctk.CTkLabel(
                 self.card,
                 text="Sélectionnez un utilisateur dans le panneau de gauche pour commencer.",
@@ -312,46 +354,52 @@ class SpyViewView(ctk.CTkFrame):
             slots.grid_rowconfigure(row, weight=1, uniform="user_slots")
 
         self.user_slot_1 = DataSlot(
-            slots, self.user_options, self.data_architect_renderer
+            slots, 1, self.user_options, self.data_architect_renderer
         )
         self.user_slot_1.grid(row=0, column=0, sticky="nsew", padx=8, pady=6)
-        self.user_slot_1.on_change(self.user_options[0])
+        self.user_slot_1.on_change(1, self.user_options[self.active_options[1]])
 
         self.user_slot_2 = DataSlot(
-            slots, self.user_options, self.data_architect_renderer
+            slots, 2, self.user_options, self.data_architect_renderer
         )
         self.user_slot_2.grid(row=1, column=0, sticky="nsew", padx=8, pady=6)
-        self.user_slot_2.on_change(self.user_options[1])
+        self.user_slot_2.on_change(2, self.user_options[self.active_options[2]])
 
     def dataframe_doer(self):
         df = pd.DataFrame()
 
+        playerlist = self.engine.database.get("playerlist") or []
+        cash_map = self.engine.database.get("cash") or {}
+        portfolios = self.engine.database.get("portfolios") or {}
+        starting_cash = (
+            self.engine.database.get("starting_cash")
+            or self.engine.config["starting_cash"]
+        )
+
         # Données de base
         df["Nom d'utilisateur"] = [
             data.nom for data in self.engine.userbase.userbase
-        ] + [name for name in self.engine.database.data["playerlist"]]
+        ] + list(playerlist)
+
         df["Portfolio"] = [data.wallet for data in self.engine.userbase.userbase] + [
-            (p := self.engine.database.get("portfolios") or {}).get(player, {})
-            for player in self.engine.database.data["playerlist"]
+            portfolios.get(player, {}) for player in playerlist
         ]
+
         df["Liquidités"] = [
             data.liquidity for data in self.engine.userbase.userbase
-        ] + [
-            self.engine.database.data["cash"][_]
-            for _ in self.engine.database.data["playerlist"]
-        ]
+        ] + [cash_map.get(player, 0) for player in playerlist]
 
         df["Statut"] = [
             self.tier_illustrater[data.tier] for data in self.engine.userbase.userbase
-        ] + [
-            self.tier_illustrater[4] for data in range(len(self.engine.database.data["playerlist"]))
-        ]
-        df["Niveau"] = [data.lvl for data in self.engine.userbase.userbase] + [
-            0 for _ in range(len(self.engine.database.data["playerlist"]))
-        ]
+        ] + [self.tier_illustrater[4]] * len(playerlist)
+
+        df["Niveau"] = [data.lvl for data in self.engine.userbase.userbase] + [0] * len(
+            playerlist
+        )
+
         df["Données de départ"] = [
             data.initial_data for data in self.engine.userbase.userbase
-        ] + [self.engine.config["starting_cash"] for _ in range(len(self.engine.database.data["playerlist"]))]
+        ] + [starting_cash] * len(playerlist)
 
         # Données calculées
         df["Holdings"] = [
@@ -364,11 +412,11 @@ class SpyViewView(ctk.CTkFrame):
             for portfolio, liquidity in zip(df["Portfolio"], df["Liquidités"])
         ]
 
-        df["G/P"] = abs(
+        df["G/P"] = (
             (df["Holdings"] - df["Données de départ"]) / df["Données de départ"] * 100
         )
 
-        if self.previous_data is not None:
+        if self.previous_data is not None and len(self.previous_data) == len(df):
             df["Change"] = np.select(
                 (
                     df["Holdings"] > self.previous_data["Holdings"],
@@ -386,10 +434,76 @@ class SpyViewView(ctk.CTkFrame):
         return df
 
     def export(self):
-        print("aaaaaaaa")
+        # 1. Userbase
+        path = filedialog.asksaveasfilename(
+            title="Exporter Userbase",
+            initialfile="userbase.csv",
+            defaultextension=".csv",
+            filetypes=[("Fichier CSV", "*.csv")],
+        )
+        if path:
+            self.data.to_csv(path, index=False, encoding="utf-8-sig")
 
-    def leaderboarder(self):
-        sorted_df = self.data.sort_values(by=self.sort_col, ascending=self.sort_asc)
+        # 2. Market
+        path = filedialog.asksaveasfilename(
+            title="Exporter Market",
+            initialfile="market.csv",
+            defaultextension=".csv",
+            filetypes=[("Fichier CSV", "*.csv")],
+        )
+        if path:
+            market_df = pd.DataFrame(
+                [
+                    {
+                        "Ticker": s.ticker,
+                        "Nom": s.name,
+                        "Prix": round(s.price, 4),
+                        "Devise": s.currency,
+                        "Actions totales": s.shares,
+                        "Actions disponibles": s.available_shares,
+                        "Capitalisation": round(s.market_cap, 2),
+                        "Volatilité": s.volatility,
+                        "Drift": s.drift,
+                    }
+                    for s in self.engine.market.stocks.values()
+                ]
+            )
+            market_df.to_csv(path, index=False, encoding="utf-8-sig")
+
+        # 3. Les 3 vues
+        slot_names = [
+            f"Vue Userbase - {self.userbase_options[self.active_options[0]]}",
+            f"Vue Utilisateur 1 - {self.user_options[self.active_options[1]]}",
+            f"Vue Utilisateur 2 - {self.user_options[self.active_options[2]]}",
+        ]
+
+        for i in range(3):
+            item = self.slot_exports.get(i)
+            if item is None:
+                continue
+            # Deux possiblités de données : graphique ou csv
+            if isinstance(item, Figure):
+                path = filedialog.asksaveasfilename(
+                    title=f"Exporter {slot_names[i]}",
+                    initialfile=f"vue_{i + 1}.png",
+                    defaultextension=".png",
+                    filetypes=[("Image PNG", "*.png")],
+                )
+                if path:
+                    item.savefig(path, facecolor=item.get_facecolor(), dpi=150)
+
+            elif isinstance(item, pd.DataFrame):
+                path = filedialog.asksaveasfilename(
+                    title=f"Exporter {slot_names[i]}",
+                    initialfile=f"vue_{i + 1}.csv",
+                    defaultextension=".csv",
+                    filetypes=[("Fichier CSV", "*.csv")],
+                )
+                if path:
+                    item.to_csv(path, index=False, encoding="utf-8-sig")
+       
+    def leaderboarder(self, data):
+        sorted_df = data.sort_values(by=self.sort_col, ascending=self.sort_asc)
         start = self.page * self.page_len
         page_df = sorted_df.iloc[start : start + self.page_len]
 
@@ -422,7 +536,13 @@ class SpyViewView(ctk.CTkFrame):
 
     def open_card(self, index):
         self.current_user_index = index
-        self.leaderboarder()  # Met à jour la couleur du bouton
+        self.leaderboarder(
+            self.data[
+                self.data["Nom d'utilisateur"].str.contains(
+                    self.selector.get(), case=False, na=False, regex=False
+                )
+            ]
+        )  # Met à jour la couleur du bouton
         self.user_carder()
 
     def data_sorter(self, col_name):
@@ -454,71 +574,99 @@ class SpyViewView(ctk.CTkFrame):
                 text=f"Nom d'utilisateur {"▼" if not self.sort_asc else "▲"}"
             )
 
-        self.leaderboarder()
+        self.leaderboarder(
+            self.data[
+                self.data["Nom d'utilisateur"].str.contains(
+                    self.selector.get(), case=False, na=False, regex=False
+                )
+            ]
+        )
 
     def page_change_doer(self, delta):
         max_page = max(0, (len(self.data) - 1) // self.page_len)
         self.page = max(0, min(self.page + delta, max_page))
         self.page_label.configure(text=f"Page {self.page+1}")
-        self.leaderboarder()
+        self.leaderboarder(
+            self.data[
+                self.data["Nom d'utilisateur"].str.contains(
+                    self.selector.get(), case=False, na=False, regex=False
+                )
+            ]
+        )
 
     def descriptor(self):
         # Tier, Niveau, Holdings, Liquidités, Concentration, Win rate, Trading style, Volatility, Percentile
+        if self.current_user_index >= len(self.engine.userbase.userbase):
+            df_history = pd.DataFrame(self._get_user_history())
+        else:
+            df_history = pd.DataFrame(
+                self.engine.userbase.userbase[
+                    self.current_user_index
+                ].transaction_history
+            )
+
+        self.trading_styles_dict_er = {}
         tier = self.data.iloc[self.current_user_index]["Statut"]
         niveau = self.data.iloc[self.current_user_index]["Niveau"]
         holdings = self.data.iloc[self.current_user_index]["Holdings"]
         liquidites = self.data.iloc[self.current_user_index]["Liquidités"]
-        percentile = 0
-        concentration = ""
-        trading_style = "a"
-        volatility = 0
-        win_rate = 0
+        percentile_rend = self.data.iloc[self.current_user_index][
+            "Percentile (Rendement)"
+        ]
+        percentile_hold = self.data.iloc[self.current_user_index]["Percentile (Argent)"]
+        concentration = (
+            max(0.0, min(100.0, (1 - liquidites / holdings) * 100))
+            if holdings > 0
+            else 0.0
+        )
+
+        if not df_history.empty and "Profit" in df_history.columns:
+            sells = df_history["Profit"].dropna()
+            win_rate = (sells > 0).mean() * 100 if len(sells) > 0 else 0.0
+        else:
+            win_rate = 0.0
 
         descriptions = {
             "Gestionnaire d'actifs": (
-                f"Une banque, un fonds d'investissement ou un gestionnaire d'actifs institutionnel"
-                f"(Niveau {niveau}), se classant dans le {percentile}e percentile des acteurs du marché. "
-                f"Avec un portefeuille évalué à {holdings} et {liquidites} de liquidités disponibles, cette entité "
-                f"maintient une concentration d'actifs de {concentration}. Son approche repose sur un style de trading "
-                f"{trading_style}, affichant une volatilité de {volatility} et un taux de réussite (win rate) de {win_rate}."
+                f"Fonds institutionnel de niveau {niveau:.2f} gérant {holdings:,.2f} $ d'actifs "
+                f"(top {max(0.1, 100 - percentile_hold):.1f} % des plus gros portefeuilles) avec {liquidites:,.2f} $ en réserve. "
+                f"Son capital est investi à {concentration:.1f} %, affichant un taux de réussite de {win_rate:.1f} % "
+                f"et un rendement supérieur à {percentile_rend:.1f} % du marché."
             ),
             "Personnalité publique": (
-                f"Une personnalité publique ou figure influente du milieu financier classée {tier} (Niveau {niveau}), "
-                f"positionnée au {percentile}e percentile. Disposant de {holdings} en actifs sous gestion et d'une réserve "
-                f"de {liquidites} en liquidités, son capital présente une concentration de {concentration}. "
-                f"Connue pour un style de trading {trading_style}, son portefeuille enregistre une volatilité de {volatility} "
-                f"et un win rate de {win_rate}."
+                f"Investisseur influent de niveau {niveau:.2f} détenant {holdings:,.2f} $ d'actifs totaux "
+                f"et {liquidites:,.2f} $ de liquidités (percentile richesse : {percentile_hold:.1f} %). "
+                f"Avec une exposition au marché de {concentration:.1f} % et un win rate de {win_rate:.1f} %, "
+                f"ses performances le placent au {percentile_rend:.1f}e percentile."
             ),
             "Corporation": (
-                f"Une corporation ou entreprise commerciale de catégorie {tier} (Niveau {niveau}), figurant dans le "
-                f"{percentile}e percentile de sa classe. Sa trésorerie et ses investissements totalisent {holdings}, "
-                f"dont {liquidites} en liquidités immédiates, avec un indice de concentration de {concentration}. "
-                f"Sa gestion financière adopte un profil {trading_style}, générant une volatilité de {volatility} "
-                f"pour un win rate global de {win_rate}."
+                f"Entité corporative de niveau {niveau:.2f} disposant d'un portefeuille de {holdings:,.2f} $ "
+                f"(percentile {percentile_hold:.1f} %) et de {liquidites:,.2f} $ disponibles. "
+                f"Engagée à {concentration:.1f} % sur les marchés, elle maintient {win_rate:.1f} % de positions gagnantes "
+                f"pour un indice de rendement de {percentile_rend:.1f} %."
             ),
             "Civil": (
-                f"Un investisseur particulier de statut {tier} (Niveau {niveau}), surpassant ses pairs au {percentile}e percentile. "
-                f"Son patrimoine investi s'élève à {holdings}, appuyé par {liquidites} de liquidités et un taux de "
-                f"concentration de {concentration}. Il opère selon un style de trading {trading_style}, avec une "
-                f"volatilité mesurée à {volatility} et un win rate de {win_rate}."
+                f"Investisseur particulier (bot niveau {niveau:.2f}) avec {holdings:,.2f} $ d'actifs totaux et {liquidites:,.2f} $ en cash. "
+                f"Son portefeuille, investi à {concentration:.1f} %, le classe au {percentile_hold:.1f}e percentile de richesse "
+                f"et au {percentile_rend:.1f}e percentile de rendement ({win_rate:.1f} % de trades gagnants)."
             ),
             "Joueur": (
-                "Un joueur actif, classé dans le {percentile}e percentile du classement. "
-                "Son capital en jeu atteint {holdings}, incluant {liquidites} de liquidités prêtes à être déployées, "
-                "avec une concentration de {concentration}. Son style de trading {trading_style} se traduit par "
-                "une volatilité de {volatility} et un win rate de {win_rate}."
+                f"Profil joueur totalisant {holdings:,.2f} $ d'actifs (top {max(0.1, 100 - percentile_hold):.1f} % des participants) "
+                f"et {liquidites:,.2f} $ de liquidités. Actuellement investi à {concentration:.1f} %, "
+                f"il affiche un taux de succès de {win_rate:.1f} % et surpasse {percentile_rend:.1f} % des investisseurs en rendement."
             ),
         }
 
         return descriptions[tier]
 
-    def data_architect_renderer(self, choice, container):
+    def data_architect_renderer(self, choice, container, index):
         if self.current_user_index is None:
             return
         user_row = self.data.iloc[self.current_user_index]
         portfolio = user_row["Portfolio"]  # Dictionnaire {ticker: quantité}
 
         if choice == "Portfolio":
+            self.active_options[index] = 0
             scroll = ctk.CTkScrollableFrame(container, fg_color="transparent")
             scroll.pack(fill="both", expand=True)
 
@@ -542,12 +690,35 @@ class SpyViewView(ctk.CTkFrame):
                     anchor="w",
                 ).grid(row=r, column=c, sticky="ew", padx=14, pady=3)
 
+            self.slot_exports[index] = pd.DataFrame(
+                [
+                    {
+                        "Ticker": stock,
+                        "Nom": self.engine.market.get_stock_by_ticker(stock).name
+                        if self.engine.market.get_stock_by_ticker(stock)
+                        else stock,
+                        "Quantité": qty,
+                        "Prix": self.engine.market.stocks[stock].price
+                        if stock in self.engine.market.stocks
+                        else 0,
+                    }
+                    for stock, qty in portfolio.items()
+                ]
+            )
+
         elif choice == "Portfolio (Graphique)":
-            fig, ax = plt.subplots(figsize=(4, 2.5), facecolor="#121418")
+            self.active_options[index] = 1
+            fig = Figure(
+                figsize=(4, 2.5), dpi=100, facecolor="#121418", layout="constrained"
+            )
+            ax = fig.add_subplot(111)
             ax.set_facecolor("#121418")
 
             tickers = list(portfolio.keys())
-            quantities = [a * self.engine.market.stocks[b].price for a, b in zip(list(portfolio.values()), tickers)]
+            quantities = [
+                a * self.engine.market.stocks[b].price
+                for a, b in zip(list(portfolio.values()), tickers)
+            ]
 
             wedges, texts, autotexts = ax.pie(
                 quantities,
@@ -564,20 +735,26 @@ class SpyViewView(ctk.CTkFrame):
                 autotext.set_fontsize(8)
 
             ax.axis("equal")
-            fig.tight_layout()
 
             canvas = FigureCanvasTkAgg(fig, master=container)
             canvas.draw()
-            canvas.get_tk_widget().pack(fill="both", expand=True, padx=6, pady=6)
-            plt.close(fig)
+            widget = canvas.get_tk_widget()
+            widget.configure(bg="#121418", highlightthickness=0)
+            widget.pack(fill="both", expand=True, padx=6, pady=6)
+            self.slot_exports[index] = fig
 
         elif choice == "Historique de transactions":
+            self.active_options[index] = 2
             if self.current_user_index >= len(self.engine.userbase.userbase):
-                df_history = pd.DataFrame(self.engine.transaction_history)
+                df_history = pd.DataFrame(self._get_user_history())[-200:]
             else:
                 df_history = pd.DataFrame(
-                self.engine.userbase.userbase[self.current_user_index].transaction_history
-                )
+                    self.engine.userbase.userbase[
+                        self.current_user_index
+                    ].transaction_history
+                )[-200:]
+
+            self.slot_exports[index] = df_history
 
             header_frame = ctk.CTkFrame(container, fg_color="#1e2329", corner_radius=6)
             header_frame.pack(fill="x", padx=5, pady=(5, 2))
@@ -635,63 +812,237 @@ class SpyViewView(ctk.CTkFrame):
             ).pack(fill="x", padx=10, pady=4)
 
         elif choice == "Évolution des actifs":
-            if self.current_user_index >= len(self.engine.userbase.userbase):
-                ctk.CTkLabel(container, text="Historique non disponible pour ce joueur.", text_color="#848e9c").pack(pady=20)
+            self.active_options[index] = 3
+            history = self._get_user_holdings_history()
+            if not history:
+                ctk.CTkLabel(
+                    container, text="En attente de données...", text_color="#848e9c"
+                ).pack(pady=20)
+                self.slot_exports[index] = None
                 return
-
-            history = self.engine.userbase.userbase[self.current_user_index].holdings_history
             color = "#0ecb81" if history[-1] >= history[0] else "#f6465d"
 
-            fig, ax = plt.subplots(figsize=(4, 2.5), facecolor="#121418")
+            fig = Figure(
+                figsize=(4, 2.5), dpi=100, facecolor="#121418", layout="constrained"
+            )
+            ax = fig.add_subplot(111)
             ax.set_facecolor("#121418")
 
             ax.plot(history, color=color, linewidth=1.8)
-            ax.fill_between(range(len(history)), history, min(history), color=color, alpha=0.12)
+            ax.fill_between(
+                range(len(history)), history, min(history), color=color, alpha=0.12
+            )
             ax.grid(True, color="#2b313a", linestyle="--", linewidth=0.5)
             ax.tick_params(colors="#848e9c", labelsize=8)
             for spine in ax.spines.values():
                 spine.set_color("#2b313a")
 
-            fig.tight_layout()
             canvas = FigureCanvasTkAgg(fig, master=container)
             canvas.draw()
-            canvas.get_tk_widget().pack(fill="both", expand=True, padx=6, pady=6)
-            plt.close(fig)
+            widget = canvas.get_tk_widget()
+            widget.configure(bg="#121418", highlightthickness=0)
+            widget.pack(fill="both", expand=True, padx=6, pady=6)
 
+            self.slot_exports[index] = fig
+
+    def data_architect_renderer_but_for_userbase(self, choice, container, index):
+        self.active_options[index] = self.userbase_options.index(choice)
+
+        if choice == "Richesse par statut":
+            grouped = self.data.groupby("Statut")["Holdings"].sum().sort_values()
+
+            fig = Figure(
+                figsize=(4, 2.2), dpi=100, facecolor="#121418", layout="constrained"
+            )
+            ax = fig.add_subplot(111)
+            ax.set_facecolor("#121418")
+
+            ax.barh(grouped.index, grouped.values, color="#0ecb81")
+            ax.tick_params(colors="#eaecef", labelsize=8)
+            for spine in ax.spines.values():
+                spine.set_color("#2b313a")
+
+            canvas = FigureCanvasTkAgg(fig, master=container)
+            canvas.draw()
+            widget = canvas.get_tk_widget()
+            widget.configure(bg="#121418", highlightthickness=0)
+            widget.pack(fill="both", expand=True, padx=6, pady=6)
+
+            self.slot_exports[index] = fig
+
+        elif choice == "Actions populaires":
+            counts = {}
+            for portfolio in self.data["Portfolio"]:
+                for ticker in portfolio:
+                    counts[ticker] = counts.get(ticker, 0) + 1
+
+            if not counts:
+                ctk.CTkLabel(
+                    container, text="Aucune action détenue.", text_color="#848e9c"
+                ).pack(pady=20)
+                self.slot_exports[index] = None
+                return
+
+            top5 = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5][::-1]
+            tickers = [t[0] for t in top5]
+            nb_holders = [t[1] for t in top5]
+
+            fig = Figure(
+                figsize=(4, 2.2), dpi=100, facecolor="#121418", layout="constrained"
+            )
+            ax = fig.add_subplot(111)
+            ax.set_facecolor("#121418")
+
+            ax.barh(tickers, nb_holders, color="#3b8ed0")
+            ax.set_xlabel("Nombre de détenteurs", color="#848e9c", fontsize=8)
+            ax.tick_params(colors="#eaecef", labelsize=8)
+            for spine in ax.spines.values():
+                spine.set_color("#2b313a")
+
+            canvas = FigureCanvasTkAgg(fig, master=container)
+            canvas.draw()
+            widget = canvas.get_tk_widget()
+            widget.configure(bg="#121418", highlightthickness=0)
+            widget.pack(fill="both", expand=True, padx=6, pady=6)
+
+            self.slot_exports[index] = fig
+
+        elif choice == "Top rendements":
+            temp = self.data.copy()
+            temp["Perf"] = (
+                (temp["Holdings"] - temp["Données de départ"])
+                / temp["Données de départ"]
+                * 100
+            )
+            top = temp.sort_values(by="Perf", ascending=False).head(10)
+
+            self.slot_exports[index] = top[["Nom d'utilisateur", "Statut", "Holdings", "Perf"]]
+
+            lines = []
+            for i, (_, row) in enumerate(top.iterrows(), start=1):
+                name = row["Nom d'utilisateur"][:24]
+                lines.append(
+                    f"{i}. {name:<24} {row['Perf']:>+8.2f} %   ({row['Statut']})"
+                )
+
+            ctk.CTkLabel(
+                container,
+                text="\n\n".join(lines),
+                text_color="#0ecb81",
+                font=("Consolas", 12),
+                justify="left",
+                anchor="nw",
+            ).pack(fill="both", expand=True, padx=14, pady=12)
+
+        # 4. Résumé chiffré global (NumPy)
+        elif choice == "Statistiques globales":
+            holdings = self.data["Holdings"].to_numpy()
+            liquidites = self.data["Liquidités"].to_numpy()
+            total = np.sum(holdings)
+            pct_cash = (np.sum(liquidites) / total * 100) if total > 0 else 0
+
+            stats_text = (
+                f"Nombre d'acteurs      : {len(self.data)}\n\n"
+                f"Richesse totale       : {total:,.2f} $\n\n"
+                f"Richesse moyenne      : {np.mean(holdings):,.2f} $\n\n"
+                f"Richesse médiane      : {np.median(holdings):,.2f} $\n\n"
+                f"Part en liquidités    : {pct_cash:.1f} %"
+            )
+
+            ctk.CTkLabel(
+                container,
+                text=stats_text,
+                text_color="#eaecef",
+                font=("Consolas", 12),
+                justify="left",
+                anchor="nw",
+            ).pack(fill="both", expand=True, padx=14, pady=12)
+
+            self.slot_exports[index] = pd.DataFrame(
+                [
+                    {"Statistique": "Nombre d'acteurs", "Valeur": len(self.data)},
+                    {"Statistique": "Richesse totale ($)", "Valeur": round(total, 2)},
+                    {"Statistique": "Richesse moyenne ($)", "Valeur": round(np.mean(holdings), 2)},
+                    {"Statistique": "Richesse médiane ($)", "Valeur": round(np.median(holdings), 2)},
+                    {"Statistique": "Part en liquidités (%)", "Valeur": round(pct_cash, 1)},
+                ]
+            )
+
+    def button_filter_doer(self, nothing=None):
+        self.leaderboarder(
+            self.data[
+                self.data["Nom d'utilisateur"].str.contains(
+                    self.selector.get(), case=False, na=False, regex=False
+                )
+            ]
+        )
+        self.selector.configure()
+
+    def _get_user_history(self):
+        if self.current_user_index >= len(self.engine.userbase.userbase):
+            username = self.data.iloc[self.current_user_index]["Nom d'utilisateur"]
+            return self.engine.database.getPath(f"player_history:{username}") or []
+        return self.engine.userbase.userbase[
+            self.current_user_index
+        ].transaction_history
+
+    def _get_user_holdings_history(self):
+        if self.current_user_index >= len(self.engine.userbase.userbase):
+            username = self.data.iloc[self.current_user_index]["Nom d'utilisateur"]
+            return (
+                self.engine.database.getPath(f"player_holdings_history:{username}")
+                or []
+            )
+        return self.engine.userbase.userbase[self.current_user_index].holdings_history
 
     def refresh(self):
         self.previous_data = None
+
+        self.active_options = [0, 0, 1]
 
         self.data = self.dataframe_doer()
         self.current_user_index = None
 
         self.user_carder()
-        self.leaderboarder()
+        self.leaderboarder(
+            self.data[
+                self.data["Nom d'utilisateur"].str.contains(
+                    self.selector.get(), case=False, na=False, regex=False
+                )
+            ]
+        )
 
     def refresher(self):
         self.previous_data = self.data
         self.data = self.dataframe_doer()
-        self.userbase_slot_1.on_change()
+        self.userbase_slot_1.on_change(0, self.userbase_options[self.active_options[0]])
 
         if self.current_user_index is not None:
-            self.user_slot_1.on_change()
-            self.user_slot_2.on_change()
+            self.user_slot_1.on_change(1, self.user_options[self.active_options[1]])
+            self.user_slot_2.on_change(2, self.user_options[self.active_options[2]])
             self.ai_desc.configure(text=self.descriptor())
 
-        self.leaderboarder()
+        self.leaderboarder(
+            self.data[
+                self.data["Nom d'utilisateur"].str.contains(
+                    self.selector.get(), case=False, na=False, regex=False
+                )
+            ]
+        )
 
 
 # Vu que les vues répètent toujours les mêmes structures :
 
+
 class DataSlot(ctk.CTkFrame):
-    def __init__(self, master, options, render_callback):
+    def __init__(self, master, index, options, render_callback):
         super().__init__(master, fg_color="transparent")
         self.render_callback = render_callback
 
         self.menu = ctk.CTkOptionMenu(
             self,
             values=options,
-            command=self.on_change,
+            command=lambda choice: self.on_change(index, choice),
             fg_color="#2b313a",
             button_color="#363c4e",
         )
@@ -700,11 +1051,11 @@ class DataSlot(ctk.CTkFrame):
         self.content = ctk.CTkFrame(self, fg_color="#121418", corner_radius=8)
         self.content.pack(fill="both", expand=True)
 
-    def on_change(self, choice=None):
+    def on_change(self, index, choice=None):
         if choice is None:
             choice = self.menu.get()
         else:
             self.menu.set(choice)
         for w in self.content.winfo_children():
             w.destroy()
-        self.render_callback(self.menu.get(), self.content)
+        self.render_callback(self.menu.get(), self.content, index)
