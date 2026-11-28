@@ -9,15 +9,29 @@ import numpy as np
 
 from assets import Assets
 
-# user topographical depicter
-
 """
-Roadmap :
+Résumé du projet :
 
-Complete the selector
-Add search bar
-Add userbase views
-Export data
+1. Changements à market.update()
+La logique précédente avait une croissance exponentielle, et était très exploitable
+car se basait sur la valeur du drift. La nouvelle logique fait varier l'action autour
+d'une droite fixe de (1 + 0.1/365)x + b, soit + 10 % par année. 
+
+2. Changements à users
+Améliorer le processur pour prendre des décisions. Remplir les portefeuilles par défaut.
+
+3. Added spy_view_view
+Barre du haut : possibilité d'exporter la userbase, le market, et chacune des trois vues
+affichées + rafraîchir.
+
+Panneau de gauche : 
+Boutons pour sélectionner un utilisateur, système de pages, filtres.
+Quatre vues : Top rendements, Richesse par statut, Actions populaires, Statistiques globales
+
+Panneau de droite : 
+Une description comme si c'était une "AI overview" (parce que c'est drôle),
+deux vues identiques et customisables.
+Quatre options : Portfolio, Portfolio (Graphique), Historique de transactions, Évolution des actifs
 
 """
 
@@ -48,7 +62,7 @@ class SpyViewView(ctk.CTkFrame):
             "Actions populaires",
             "Statistiques globales",
         ]
-
+        # Pour conserver les options sélectionnées
         self.active_options = [0, 0, 1]
 
         self.button_style = {
@@ -68,19 +82,23 @@ class SpyViewView(ctk.CTkFrame):
             4: "Joueur",
         }
 
+        # Congig par défaut
         self.page_len = 30
         self.page = 0
         self.sort_col = "Holdings"
         self.sort_asc = False
         self.row_buttons = []
 
+        # Boutons d'utilisateurs
         self.mover_buttons = []
 
+        # Pour permettre des comparaisons
         self.previous_data = None
 
         self.data = self.dataframe_doer()
         self.current_user_index = None
 
+        # Pour définir quelles sont les vues à exporter
         self.slot_exports = {0: None, 1: None, 2: None}
 
         self.top_bar_builder_yet_again()
@@ -91,6 +109,7 @@ class SpyViewView(ctk.CTkFrame):
         bar = ctk.CTkFrame(self, fg_color="#181a20", height=48, corner_radius=0)
         bar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, 4))
 
+        # Icône
         self.icon = ctk.CTkLabel(bar, text="👁", font=("Arial", 30, "bold"))
         self.icon.pack(side="left", padx=12, pady=8)
 
@@ -98,6 +117,7 @@ class SpyViewView(ctk.CTkFrame):
         self.name = ctk.CTkLabel(bar, text="SpyView™", font=("Arial", 20, "bold"))
         self.name.pack(side="left", padx=12, pady=8)
 
+        # Bouton pour rafraîchir
         refresh = ctk.CTkImage(
             dark_image=Image.open(self.assets.getAssetPath("refresh.png")),
             size=(24, 24),
@@ -111,6 +131,7 @@ class SpyViewView(ctk.CTkFrame):
         )
         self.btn_refresh.pack(side="right", padx=10)
 
+        # Bouton pour exporter
         export = ctk.CTkImage(
             dark_image=Image.open(self.assets.getAssetPath("file-export.png")),
             size=(24, 24),
@@ -124,6 +145,7 @@ class SpyViewView(ctk.CTkFrame):
         )
         self.btn_export.pack(side="right", padx=10)
 
+    # Panneau de gauche
     def left_view_builder(self):
         panel = ctk.CTkFrame(self, fg_color="#181a20", corner_radius=6)
         panel.grid(row=1, column=0, sticky="nsew", padx=(12, 6), pady=3)
@@ -137,7 +159,7 @@ class SpyViewView(ctk.CTkFrame):
         )
         title.pack(anchor="w", padx=12, pady=(12, 0))
 
-        # 2 Selections
+        # Filtre (recherche)
         self.selector = ctk.CTkEntry(
             panel,
             width=180,
@@ -152,12 +174,12 @@ class SpyViewView(ctk.CTkFrame):
 
         self.selector.bind("<KeyRelease>", self.button_filter_doer)
 
-        # Premier panneau
+        # Carte
 
         self.card1 = ctk.CTkScrollableFrame(panel, fg_color="#121418", corner_radius=8)
         self.card1.pack(fill="x", padx=12, pady=(6, 12))
 
-        # Filtres
+        # Trier par catégorie
         filter_btn_area = ctk.CTkFrame(self.card1, fg_color="#121418")
         filter_btn_area.pack(fill="x")
 
@@ -202,6 +224,7 @@ class SpyViewView(ctk.CTkFrame):
         )
         self.status_btn.grid(row=0, column=2, sticky="nsew", padx=(0, 5))
 
+        # Créer les boutons pour choisir un utilisateur
         # Vue
         self.page = 0
         self.sort_col = "Holdings"
@@ -281,7 +304,9 @@ class SpyViewView(ctk.CTkFrame):
             ),
         )
 
+    # Panneau de droite
     def user_carder(self):
+        # Pour reconstruire la carte après un nouveau choix
         if not hasattr(self, "card"):
             self.card = ctk.CTkFrame(self, fg_color="#181a20", corner_radius=6)
             self.card.grid(row=1, column=1, sticky="nsew", padx=(6, 12), pady=3)
@@ -290,6 +315,7 @@ class SpyViewView(ctk.CTkFrame):
         for widget in self.card.winfo_children():
             widget.destroy()
 
+        # Tant qu'il n'y a pas eu de choix
         if self.current_user_index is None:
             self.slot_exports[1] = None
             self.slot_exports[2] = None
@@ -320,8 +346,7 @@ class SpyViewView(ctk.CTkFrame):
             text_color="#eaecef",
             font=("Arial", 14, "bold"),
         )
-        ai.pack(anchor="nw", padx=14, pady=(14, 8))
-
+        ai.pack(anchor="nw", padx=14, pady=6)
         self.ai_desc = ctk.CTkLabel(
             self.card,
             text=desc,
@@ -330,8 +355,10 @@ class SpyViewView(ctk.CTkFrame):
             anchor="w",
             justify="left",
         )
-        self.ai_desc.pack(anchor="nw", fill="x", padx=14)
 
+        self.ai_desc.pack(anchor="nw", fill="x", padx=14, pady=6)
+
+        # Pour permettre au texte de changer de ligne tout seul
         def update_wrap(event):
             if not self.ai_desc.winfo_exists():
                 return
@@ -365,6 +392,7 @@ class SpyViewView(ctk.CTkFrame):
         self.user_slot_2.grid(row=1, column=0, sticky="nsew", padx=8, pady=6)
         self.user_slot_2.on_change(2, self.user_options[self.active_options[2]])
 
+    # Créer le dataframe des données
     def dataframe_doer(self):
         df = pd.DataFrame()
 
@@ -433,6 +461,7 @@ class SpyViewView(ctk.CTkFrame):
 
         return df
 
+    # Exporter les données
     def export(self):
         # 1. Userbase
         path = filedialog.asksaveasfilename(
@@ -501,7 +530,8 @@ class SpyViewView(ctk.CTkFrame):
                 )
                 if path:
                     item.to_csv(path, index=False, encoding="utf-8-sig")
-       
+
+    # Configurer les boutons en fonction des données fournies
     def leaderboarder(self, data):
         sorted_df = data.sort_values(by=self.sort_col, ascending=self.sort_asc)
         start = self.page * self.page_len
@@ -534,6 +564,7 @@ class SpyViewView(ctk.CTkFrame):
             else:
                 btn.pack_forget()
 
+    # Ouvrir la carte de l'utilisateur sélectionné
     def open_card(self, index):
         self.current_user_index = index
         self.leaderboarder(
@@ -542,9 +573,10 @@ class SpyViewView(ctk.CTkFrame):
                     self.selector.get(), case=False, na=False, regex=False
                 )
             ]
-        )  # Met à jour la couleur du bouton
+        )  # Met à jour la couleur du bouton pour que le bouton de l'utilisateur sélectionné soit en surbrillance
         self.user_carder()
 
+    # Trier les boutons par la colonne sélectionnée
     def data_sorter(self, col_name):
         if self.sort_col == col_name:
             self.sort_asc = not self.sort_asc
@@ -582,6 +614,7 @@ class SpyViewView(ctk.CTkFrame):
             ]
         )
 
+    # Re-configure les boutons en fonction de la page
     def page_change_doer(self, delta):
         max_page = max(0, (len(self.data) - 1) // self.page_len)
         self.page = max(0, min(self.page + delta, max_page))
@@ -594,8 +627,9 @@ class SpyViewView(ctk.CTkFrame):
             ]
         )
 
+    # Retourne les descriptions générées par "IA"
     def descriptor(self):
-        # Tier, Niveau, Holdings, Liquidités, Concentration, Win rate, Trading style, Volatility, Percentile
+        # Au cas où, les descriptions ne sont pas vraiment générées par IA.
         if self.current_user_index >= len(self.engine.userbase.userbase):
             df_history = pd.DataFrame(self._get_user_history())
         else:
@@ -659,6 +693,7 @@ class SpyViewView(ctk.CTkFrame):
 
         return descriptions[tier]
 
+    # Créer les vues de userbase
     def data_architect_renderer(self, choice, container, index):
         if self.current_user_index is None:
             return
@@ -694,13 +729,17 @@ class SpyViewView(ctk.CTkFrame):
                 [
                     {
                         "Ticker": stock,
-                        "Nom": self.engine.market.get_stock_by_ticker(stock).name
-                        if self.engine.market.get_stock_by_ticker(stock)
-                        else stock,
+                        "Nom": (
+                            self.engine.market.get_stock_by_ticker(stock).name
+                            if self.engine.market.get_stock_by_ticker(stock)
+                            else stock
+                        ),
                         "Quantité": qty,
-                        "Prix": self.engine.market.stocks[stock].price
-                        if stock in self.engine.market.stocks
-                        else 0,
+                        "Prix": (
+                            self.engine.market.stocks[stock].price
+                            if stock in self.engine.market.stocks
+                            else 0
+                        ),
                     }
                     for stock, qty in portfolio.items()
                 ]
@@ -845,6 +884,7 @@ class SpyViewView(ctk.CTkFrame):
 
             self.slot_exports[index] = fig
 
+    # Créer les vues de userbase
     def data_architect_renderer_but_for_userbase(self, choice, container, index):
         self.active_options[index] = self.userbase_options.index(choice)
 
@@ -883,9 +923,9 @@ class SpyViewView(ctk.CTkFrame):
                 self.slot_exports[index] = None
                 return
 
-            top5 = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5][::-1]
-            tickers = [t[0] for t in top5]
-            nb_holders = [t[1] for t in top5]
+            top10 = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5][::-1]
+            tickers = [t[0] for t in top10]
+            nb_holders = [t[1] for t in top10]
 
             fig = Figure(
                 figsize=(4, 2.2), dpi=100, facecolor="#121418", layout="constrained"
@@ -916,7 +956,9 @@ class SpyViewView(ctk.CTkFrame):
             )
             top = temp.sort_values(by="Perf", ascending=False).head(10)
 
-            self.slot_exports[index] = top[["Nom d'utilisateur", "Statut", "Holdings", "Perf"]]
+            self.slot_exports[index] = top[
+                ["Nom d'utilisateur", "Statut", "Holdings", "Perf"]
+            ]
 
             lines = []
             for i, (_, row) in enumerate(top.iterrows(), start=1):
@@ -962,12 +1004,22 @@ class SpyViewView(ctk.CTkFrame):
                 [
                     {"Statistique": "Nombre d'acteurs", "Valeur": len(self.data)},
                     {"Statistique": "Richesse totale ($)", "Valeur": round(total, 2)},
-                    {"Statistique": "Richesse moyenne ($)", "Valeur": round(np.mean(holdings), 2)},
-                    {"Statistique": "Richesse médiane ($)", "Valeur": round(np.median(holdings), 2)},
-                    {"Statistique": "Part en liquidités (%)", "Valeur": round(pct_cash, 1)},
+                    {
+                        "Statistique": "Richesse moyenne ($)",
+                        "Valeur": round(np.mean(holdings), 2),
+                    },
+                    {
+                        "Statistique": "Richesse médiane ($)",
+                        "Valeur": round(np.median(holdings), 2),
+                    },
+                    {
+                        "Statistique": "Part en liquidités (%)",
+                        "Valeur": round(pct_cash, 1),
+                    },
                 ]
             )
 
+    # Re-configurer les boutons en fonction du filte
     def button_filter_doer(self, nothing=None):
         self.leaderboarder(
             self.data[
@@ -978,6 +1030,7 @@ class SpyViewView(ctk.CTkFrame):
         )
         self.selector.configure()
 
+    # Pour la database
     def _get_user_history(self):
         if self.current_user_index >= len(self.engine.userbase.userbase):
             username = self.data.iloc[self.current_user_index]["Nom d'utilisateur"]
@@ -986,6 +1039,7 @@ class SpyViewView(ctk.CTkFrame):
             self.current_user_index
         ].transaction_history
 
+    # Pour la database
     def _get_user_holdings_history(self):
         if self.current_user_index >= len(self.engine.userbase.userbase):
             username = self.data.iloc[self.current_user_index]["Nom d'utilisateur"]
@@ -995,6 +1049,7 @@ class SpyViewView(ctk.CTkFrame):
             )
         return self.engine.userbase.userbase[self.current_user_index].holdings_history
 
+    # Quand la simulation est réinitialisée
     def refresh(self):
         self.previous_data = None
 
@@ -1012,6 +1067,7 @@ class SpyViewView(ctk.CTkFrame):
             ]
         )
 
+    # Pour le bouton rafraîchir
     def refresher(self):
         self.previous_data = self.data
         self.data = self.dataframe_doer()

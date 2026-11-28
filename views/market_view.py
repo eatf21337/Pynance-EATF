@@ -1,5 +1,4 @@
 import customtkinter as ctk
-from tkinter import messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
@@ -403,7 +402,7 @@ class MarketView(ctk.CTkFrame):
 
         cash = self.engine.database.getPath(f"cash:{self.engine.username}")
         cash = number_formatter(cash) if cash else "ERROR"
-        self.user_cash.configure(text=f"⭐ {cash} $ ⭐")
+        self.user_cash.configure(text=f"⭐ {cash:.2f} $ ⭐")
         self.canvas.draw()
 
     # Changements du marché

@@ -1,5 +1,3 @@
-import pandas as pd
-
 import random as rd
 import json
 import math
@@ -35,13 +33,12 @@ class User:
         if not all_tickers:
             return
 
-        # 1. Probabilité d'agir et nombre d'actions observées selon le niveau / tier
-        # Les gros acteurs (lvl >= 8 ou tier en haut de la hiérarchie) regardent 100 % du marché
-        if self.lvl >= 8.0 or self.tier in (0, 1):
+        # Choisir sur quelles actions investir
+        if self.lvl >= 8.0 or self.tier in (0, 2):
             activity_chance = 1.0
             sample_tickers = all_tickers
         else:
-            # Tiers inférieurs / particuliers : action ponctuelle et attention limitée
+            # Attention limitée pour tier 2 et 4
             activity_chance = min(0.65, 0.15 + 0.08 * self.lvl)
             nb_seen = max(1, min(len(all_tickers), int(3 + self.lvl * 2)))
             sample_tickers = rd.sample(all_tickers, nb_seen)
@@ -49,11 +46,11 @@ class User:
         if rd.random() > activity_chance:
             return
 
-        # 2. Précision d'analyse : les meilleurs bots ont presque zéro bruit
+        # Varier la précision de l'analyse
         skill_factor = max(0.0, (10.0 - min(10.0, self.lvl)) / 10.0)
         noise_std = 0.06 * skill_factor
 
-        # 3. Achat sur la meilleure opportunité perçue
+        # Achat sur la meilleure opportunité perçue
         best_ticker = None
         best_score = -999.0
 
@@ -65,7 +62,6 @@ class User:
 
         if best_ticker and best_score > 0.002:
             stock = market.stocks[best_ticker]
-            # Les bots forts investissent plus franchement quand le signal est bon
             alloc_min = 0.10 if self.lvl >= 7 else 0.05
             alloc_max = 0.35 if self.lvl >= 7 else 0.15
             budget = self.liquidity * rd.uniform(alloc_min, alloc_max)
@@ -74,7 +70,7 @@ class User:
             if qty > 0:
                 self.buy_stock(stock, qty)
 
-        # 4. Vente seulement si le signal est nettement négatif (évite de vendre sur un simple bruit)
+        # Vendre
         sell_threshold = -0.025 if self.lvl >= 7 else -0.015
         for ticker, owned_qty in list(self.wallet.items()):
             if owned_qty <= 0:
@@ -82,7 +78,9 @@ class User:
             perceived = good_stocks.get(ticker, 0.0) + rd.gauss(0, noise_std)
             if perceived < sell_threshold:
                 stock = market.stocks[ticker]
-                sell_ratio = rd.uniform(0.15, 0.45) if self.lvl >= 7 else rd.uniform(0.30, 0.80)
+                sell_ratio = (
+                    rd.uniform(0.15, 0.45) if self.lvl >= 7 else rd.uniform(0.30, 0.80)
+                )
                 sell_qty = max(1, int(owned_qty * sell_ratio))
                 self.sell_stock(stock, sell_qty)
 
@@ -91,10 +89,9 @@ class User:
         max_allowed = int(stock.shares * 0.05) - already_owned
         qty = min(qty, stock.available_shares, max(0, max_allowed))
 
-
         cost = stock.price * qty
         if self.liquidity >= cost and qty > 0:
-            self.avg_cost[stock.ticker].append(stock.price)            
+            self.avg_cost[stock.ticker].append(stock.price)
             self.liquidity -= cost
             self.wallet[stock.ticker] = already_owned + qty
             stock.buy(qty)
@@ -105,7 +102,7 @@ class User:
                     "Amount_Shares": qty,
                     "Amount_Cash": round(-cost, 2),
                     "Share_Price": round(stock.price, 2),
-                    "Profit": None
+                    "Profit": None,
                 }
             )
 
@@ -126,7 +123,11 @@ class User:
                     "Amount_Shares": -qty,
                     "Amount_Cash": round(stock.price * qty, 2),
                     "Share_Price": round(stock.price, 2),
-                    "Profit": (stock.price - statistics.mean(self.avg_cost[stock.ticker])) / statistics.mean(self.avg_cost[stock.ticker]) * 100
+                    "Profit": (
+                        stock.price - statistics.mean(self.avg_cost[stock.ticker])
+                    )
+                    / statistics.mean(self.avg_cost[stock.ticker])
+                    * 100,
                 }
             )
 
@@ -317,28 +318,33 @@ class Userbase:
             bot.make_decision(market, good_stocks)
             bot.holdings_history.append(round(bot.get_holdings(market), 2))
 
-
+    # Remplir les portefeuilles par défaut
     def populate_wallets(self, market):
         all_stocks = list(market.stocks.values())
+        # SHIB-USD cause vraiment beaucoup de problèmes apparemment -_-
         filter = market.get_stock_by_ticker("SHIB-USD")
         if filter in all_stocks:
             all_stocks.remove(filter)
         if not all_stocks:
             return
 
-        bot_tier_doer_of_magic = {
-            0: (586, 586),
-            1: (10, 50),
-            2: (250, 587),
-            3: (1, 20)
-        }
+        # Le nombre de stocks par défaut en fonction du tier
+        bot_tier_doer_of_magic = {0: (586, 586), 1: (10, 50), 2: (250, 586), 3: (1, 20)}
 
         for bot in self.userbase:
-            invest_ratio = rd.uniform(0.60, 0.85) if bot.tier in (0, 1) else rd.uniform(0.10, 0.60)
+            invest_ratio = (
+                rd.uniform(0.60, 0.85) if bot.tier in (0, 1) else rd.uniform(0.10, 0.60)
+            )
             budget_to_invest = bot.liquidity * invest_ratio
             remaining_cash = bot.liquidity - budget_to_invest
 
-            nb_stocks = min(len(all_stocks), rd.randint(bot_tier_doer_of_magic[bot.tier][0], bot_tier_doer_of_magic[bot.tier][1]))
+            nb_stocks = min(
+                len(all_stocks),
+                rd.randint(
+                    bot_tier_doer_of_magic[bot.tier][0],
+                    bot_tier_doer_of_magic[bot.tier][1],
+                ),
+            )
             chosen_stocks = rd.sample(all_stocks, nb_stocks)
 
             wallet = {}
@@ -357,7 +363,7 @@ class Userbase:
                 else:
                     remaining_cash += budget_per_stock
 
-                bot.avg_cost[stock.ticker].append(stock.price)  
+                bot.avg_cost[stock.ticker].append(stock.price)
 
             bot.wallet_setter(wallet)
             bot.cash_setter(round(remaining_cash, 2))
